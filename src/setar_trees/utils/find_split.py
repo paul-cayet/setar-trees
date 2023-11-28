@@ -1,8 +1,9 @@
 import numpy as np
 from numpy.linalg import solve, LinAlgError
+from IPython.display import display
 
 
-def find_cut_point(X, y, x_ix, k, lag, criterion="RSS"):
+def find_cut_point(X, y, x_ix, k, lag, criterion="RSS", verbose=0):
     """
     TODO:
     - Change name k
@@ -14,7 +15,8 @@ def find_cut_point(X, y, x_ix, k, lag, criterion="RSS"):
     - Need to check that matrix X does is not singular /!\
     -> no more cols than rows and no linear combi
     """
-    eps = 1e-8  # min RSS, to avoid errors in log computation with AIC
+    LOG_EPS = 1e-8  # min RSS, to avoid errors in log computation with AIC
+    DEN_EPS = 0.1  # min denominator of AIC, to avoid runtime errors
     recheck = 0
     n_rows, n_cols = X.shape
 
@@ -52,6 +54,7 @@ def find_cut_point(X, y, x_ix, k, lag, criterion="RSS"):
     # computing inner products
     for i in range(k + 1):
         ix = np.where((x_ix >= q[i]) & (x_ix < q[i + 1]))[0]
+        # print(f"ix={ix}")
 
         # if len(ix) == 0 we don't do anything
         if len(ix) > 0:
@@ -87,7 +90,10 @@ def find_cut_point(X, y, x_ix, k, lag, criterion="RSS"):
         yty_right -= yty_list[i]
         n_right -= n_s[i]
 
-        if n_left > 0 and n_right > 0:
+        if (
+            n_left > n_cols and n_right > n_cols
+        ):  # TODO: Solves the singular matrix problem but likely to
+            # lead to statistical issues (e.g. fitting a model on too few data)
             try:
                 # print('XtX_left')
                 # print([XtX_left])
@@ -107,21 +113,31 @@ def find_cut_point(X, y, x_ix, k, lag, criterion="RSS"):
                 )  # same
 
                 # To account for stability issues (will need to be fixed later)
-                RSS_left[i] = max(eps, RSS_left[i])
-                RSS_right[i] = max(eps, RSS_right[i])
+                RSS_left[i] = max(LOG_EPS, RSS_left[i])
+                RSS_right[i] = max(LOG_EPS, RSS_right[i])
 
                 # Compute the model scores
+
                 AICc_left[i] = (
                     n_left * np.log(2 * np.pi * RSS_left[i] / n_left)
                     + n_left
-                    + (n_cols + 1) * n_left / (n_left - n_cols - 1)
+                    + (n_cols + 1) * n_left / max(DEN_EPS, n_left - n_cols - 1)
                 )
                 AICc_right[i] = (
                     n_right * np.log(2 * np.pi * RSS_right[i] / n_right)
                     + n_right
-                    + (n_cols + 1) * n_right / (n_right - n_cols - 1)
+                    + (n_cols + 1)
+                    * n_right
+                    / max(DEN_EPS, n_right - n_cols - 1)
                 )
             except LinAlgError as e:
+                print("X")
+                print([X])
+                print("XtX_left")
+                print([XtX_left])
+                print("Xty_left")
+                print([Xty_left])
+                print(f"n_right={n_right}, n_left={n_left}")
                 recheck += 1
                 b_left[:, i] = np.inf
                 b_right[:, i] = np.inf
@@ -166,7 +182,7 @@ def find_cut_point(X, y, x_ix, k, lag, criterion="RSS"):
 
     return {
         "I": I,
-        "cut_point": q[I + 1],
+        "cut_point": q[I + 1],  # TODO: investigate whether that is true??
         "b_left": b_left[:, I],
         "b_right": b_right[:, I],
         "RSS_left": RSS_left[I],

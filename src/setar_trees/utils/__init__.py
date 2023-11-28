@@ -6,4 +6,5 @@ from setar_trees.utils.tree_helper import (
     get_leaf_index,
     check_linearity,
     check_error_improvement,
+    fit_global_model,
 )

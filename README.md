@@ -20,3 +20,4 @@ Learnings
     - `Array[:, -1]` means all columns except the first one ???
     - `XtX = list(); XtX.left = matrix(0,p,p)` is possible, like... why not?
     - True is T and False is F, like why would you want to have explicit naming in your code anyway?
+    - length(1) = 1 ...

@@ -16,17 +16,29 @@ def create_split(data, conditional_lag, threshold):
 
 # A function to traverse through the tree based on the
 # used thresholds and lags during splitting
+# def tree_traverse(instance, split, threshold):
+#     """
+#     TODO: Change it to be Numpy comptatible
+#     """
+#     direction = "left"
+#     if instance[split] >= threshold:
+#         direction = "right"
+#     return direction
+
+
 def tree_traverse(instance, split, threshold):
     """
     TODO: Change it to be Numpy comptatible
     """
     direction = "left"
-    if instance[split] >= threshold:
+    if (
+        instance.iloc[0, split - 1] >= threshold
+    ):  # -1 because we don't have the y variable anymore
         direction = "right"
     return direction
 
 
-def get_leaf_index(instance, splits, thresholds):
+def get_leaf_index(instance, splits, thresholds, verbose=0):
     """
     TODO:
     - Rename variables
@@ -94,8 +106,9 @@ def fit_global_model(data):
     # Implement the logic for fitting a model to the data
     # For demo purposes, we'll just return zeros
     X, y = data.iloc[:, 1:], data.iloc[:, 0]
-    preds = LinearRegression().fit(X, y).predict(X)
-    return preds
+    model = LinearRegression().fit(X, y)
+    preds = model.predict(X)
+    return {"preds": preds, "model": model}
 
 
 # A function to calculate Sum of Squared Errors (SSE)
@@ -112,8 +125,8 @@ def SS(p, train_data, current_lg):
     cost = float("inf")
     if not left.empty and not right.empty:
         # Placeholder for the fit_global_model function
-        residuals_l = left["y"] - fit_global_model(left)
-        residuals_r = right["y"] - fit_global_model(right)
+        residuals_l = left["y"] - fit_global_model(left)["preds"]
+        residuals_r = right["y"] - fit_global_model(right)["preds"]
         current_residuals = np.concatenate([residuals_l, residuals_r])
         cost = np.sum(current_residuals**2)
 
@@ -122,12 +135,15 @@ def SS(p, train_data, current_lg):
 
 # A function to check whether there exists a remaining
 # non-linearity in the parent node instances
-def check_linearity(parent_node, child_nodes, lag, significance):
+def check_linearity(parent_node, child_nodes, lag, significance, verbose=0):
 
     is_significant = True
 
-    ss0 = np.sum((parent_node["y"] - fit_global_model(parent_node)) ** 2)
-    print(ss0)
+    ss0 = np.sum(
+        (parent_node["y"] - fit_global_model(parent_node)["preds"]) ** 2
+    )
+    if verbose > 0:
+        print(f"SSO={ss0:.3f}")
     if ss0 == 0:
         is_significant = False
     else:
@@ -136,7 +152,7 @@ def check_linearity(parent_node, child_nodes, lag, significance):
             train_residuals = np.concatenate(
                 [
                     train_residuals,
-                    (child_node["y"] - fit_global_model(child_node)),
+                    (child_node["y"] - fit_global_model(child_node)["preds"]),
                 ]
             )
 
@@ -160,7 +176,9 @@ def check_linearity(parent_node, child_nodes, lag, significance):
 def check_error_improvement(parent_node, child_nodes, error_threshold):
     is_improved = True
 
-    ss0 = np.sum((parent_node["y"] - fit_global_model(parent_node)) ** 2)
+    ss0 = np.sum(
+        (parent_node["y"] - fit_global_model(parent_node)["preds"]) ** 2
+    )
 
     if ss0 == 0:
         is_improved = False
@@ -170,7 +188,7 @@ def check_error_improvement(parent_node, child_nodes, error_threshold):
             train_residuals = np.concatenate(
                 [
                     train_residuals,
-                    (child_node["y"] - fit_global_model(child_node)),
+                    (child_node["y"] - fit_global_model(child_node)["preds"]),
                 ]
             )
 
